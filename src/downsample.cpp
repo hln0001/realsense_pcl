@@ -50,7 +50,7 @@ void cloud_callback (const sensor_msgs::PointCloud2& cloud_msg)
   //Voxel Grid Filter the points
   pcl::VoxelGrid<pcl::PCLPointCloud2> vox;
   vox.setInputCloud(cloud);
-  vox.setLeafSize(0.01,0.01,0.01);
+  vox.setLeafSize(0.005,0.005,0.005);
   vox.filter(*cloud_filtered);
 
 //  pcl_pub.publish(cloud_filtered);
