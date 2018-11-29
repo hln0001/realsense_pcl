@@ -35,7 +35,7 @@ void seg_callback(const sensor_msgs::PointCloud2& cloud_msg)
   seg.setModelType(pcl::SACMODEL_PLANE);
   seg.setMethodType(pcl::SAC_RANSAC);
   seg.setMaxIterations(1000);
-  seg.setDistanceThreshold(.25);
+  seg.setDistanceThreshold(.01);
 
   seg.setInputCloud(cloud);
   seg.segment(*inliers, *coefficents);
