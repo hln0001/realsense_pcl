@@ -44,7 +44,7 @@ void cloud_callback (const sensor_msgs::PointCloud2& cloud_msg)
   //passthrough filter the points in x
   pass.setInputCloud(cloud);
   pass.setFilterFieldName("x");
-  pass.setFilterLimits(-1,6);
+  pass.setFilterLimits(-6,6);
   pass.filter(*cloud);
 
   //Voxel Grid Filter the points

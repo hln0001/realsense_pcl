@@ -1,4 +1,6 @@
 #include <ros/ros.h>
+#include <std_msgs/Bool.h>
+#include <ros/console.h>
 
 #include <pcl_conversions/pcl_conversions.h>
 #include <pcl/point_cloud.h>
@@ -13,12 +15,16 @@
 #include <pcl/segmentation/sac_segmentation.h>
 #include <pcl/filters/extract_indices.h>
 
-float wall_threshold = -0.2;
-int wall_point_threshold = 50;
-int object_point_threshold = 100;
+
+double wall_threshold;
+int wall_point_threshold;
+int object_point_threshold;
+int max_iterations;
+double distance_threshold;
 
 ros::Publisher ground_pub;
 ros::Publisher object_pub;
+ros::Publisher obstacle_pub; 
 
 void seg_callback(const sensor_msgs::PointCloud2& cloud_msg)
 {
@@ -38,8 +44,8 @@ void seg_callback(const sensor_msgs::PointCloud2& cloud_msg)
   seg.setOptimizeCoefficients(true);
   seg.setModelType(pcl::SACMODEL_PLANE);
   seg.setMethodType(pcl::SAC_RANSAC);
-  seg.setMaxIterations(1000);
-  seg.setDistanceThreshold(.1);
+  seg.setMaxIterations(max_iterations);
+  seg.setDistanceThreshold(distance_threshold);
 
   seg.setInputCloud(cloud);
   seg.segment(*inliers, *coefficents);
@@ -65,6 +71,7 @@ void seg_callback(const sensor_msgs::PointCloud2& cloud_msg)
 
   //Check for obstacles in two stages: high obstacles in ground cloud, amount of points in object cloud
   //Check for walls, etc in the ground plane
+  std_msgs::Bool obstacle_state;
   int point_count = 0;
 
   for (int i = 0; i <= ground_filtered->points.size(); i++) {
@@ -73,14 +80,26 @@ void seg_callback(const sensor_msgs::PointCloud2& cloud_msg)
     }
   }
 
+  ROS_INFO("points: %u", point_count);
+  ROS_INFO("test");
+
   if (point_count > wall_point_threshold) {
-    //HOUSTON, wE hAvE a PrObLeM
+    obstacle_state.data = true;
+  }
+  else 
+  {
+  obstacle_state.data = false;
   }
 
   //Check for the amount of obstacles in the object cloud
-  if (object_filtered->points.size() >= wall_point_threshold) {
-    //HOUSTON, wE hAvE a PrObLeM AGAIN
+  if (object_filtered->points.size() >= wall_point_threshold && obstacle_state.data == false) {
+    obstacle_state.data = true;
   }
+  else 
+  {
+  obstacle_state.data = false;
+  }
+  obstacle_pub.publish(obstacle_state);
 }
 
 int main(int argc, char** argv)
@@ -88,10 +107,17 @@ int main(int argc, char** argv)
   ros::init(argc, argv, "planar_segmentation");
   ros::NodeHandle nh;
 
+  nh.param("wall_threshold", wall_threshold, -0.2);
+  nh.param("wall_point_threshold", wall_point_threshold, 50);
+  nh.param("object_point_threshold", object_point_threshold, 100);
+  nh.param("distance_threshold", distance_threshold, 0.1);
+  nh.param("max_iterations", max_iterations, 1000);
+
   ros::Subscriber sub = nh.subscribe("cloud_filtered", 1, seg_callback);
 
   ground_pub = nh.advertise<pcl::PointCloud <pcl::PointXYZRGB> >("ground_points", 1);
   object_pub = nh.advertise<pcl::PointCloud <pcl::PointXYZRGB> >("object_points", 1);
+  obstacle_pub = nh.advertise<std_msgs::Bool>("obstacle_state", 1);
 
   ros::spin();
 }
