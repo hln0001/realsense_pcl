@@ -3,10 +3,10 @@
 	<include file="$(find realsense2_camera)/launch/rs_rgbd.launch"/>
 	
 	<!--Set parameters for filter here-->
-	<param name="wall_threshold" value="-0.2"/> <!--Z-height (referenced from camera) for a wall point in the ground plane pointcloud (higher = more obstacles ignored)-->
-	<param name="wall_point_threshold" value="1"/> <!--number of wall points to trigger avoidance (higher = more sensitive)-->
-	<param name="object_point_threshold" value="1"/> <!--number of object points to trigger avoidance (higher = more sensitive)-->
-	<param name="distance_threshold" value="0.01"/> <!--distance of a point from a plane to be included in the plane (higher = more obstacles ignored)-->
+	<param name="wall_threshold" value="1"/> <!--Z-height (referenced from camera) for a wall point in the ground plane pointcloud (higher = more obstacles ignored)-->
+	<param name="wall_point_threshold" value="200"/> <!--number of wall points to trigger avoidance (higher = more sensitive)-->
+	<param name="object_point_threshold" value="200"/> <!--number of object points to trigger avoidance (higher = more sensitive)-->
+	<param name="distance_threshold" value="0.05"/> <!--distance of a point from a plane to be included in the plane (higher = more obstacles ignored)-->
 	<param name="max_iterations" value="1000"/> <!--number of iterations for planar segmentation (higher = slower)-->
 
 	<node name="downsample" pkg="realsense_pcl" type="downsample"/>

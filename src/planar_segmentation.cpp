@@ -95,10 +95,7 @@ void seg_callback(const sensor_msgs::PointCloud2& cloud_msg)
   if (object_filtered->points.size() >= wall_point_threshold && obstacle_state.data == false) {
     obstacle_state.data = true;
   }
-  else 
-  {
-  obstacle_state.data = false;
-  }
+  
   obstacle_pub.publish(obstacle_state);
 }
 
