@@ -13,6 +13,10 @@
 #include <pcl/segmentation/sac_segmentation.h>
 #include <pcl/filters/extract_indices.h>
 
+float wall_threshold = -0.2;
+int wall_point_threshold = 50;
+int object_point_threshold = 100;
+
 ros::Publisher ground_pub;
 ros::Publisher object_pub;
 
@@ -58,6 +62,25 @@ void seg_callback(const sensor_msgs::PointCloud2& cloud_msg)
   //Publish
   ground_pub.publish(ground_filtered);
   object_pub.publish(object_filtered);
+
+  //Check for obstacles in two stages: high obstacles in ground cloud, amount of points in object cloud
+  //Check for walls, etc in the ground plane
+  int point_count = 0;
+
+  for (int i = 0; i <= ground_filtered->points.size(); i++) {
+    if (ground_filtered->points[i].z >= wall_threshold) {
+      point_count ++;
+    }
+  }
+
+  if (point_count > wall_point_threshold) {
+    //HOUSTON, wE hAvE a PrObLeM
+  }
+
+  //Check for the amount of obstacles in the object cloud
+  if (object_filtered->points.size() >= wall_point_threshold) {
+    //HOUSTON, wE hAvE a PrObLeM AGAIN
+  }
 }
 
 int main(int argc, char** argv)
