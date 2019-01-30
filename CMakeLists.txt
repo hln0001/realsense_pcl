@@ -140,6 +140,9 @@ include_directories(
  add_executable(planar_segmentation src/planar_segmentation.cpp)
  target_link_libraries(planar_segmentation ${catkin_LIBRARIES})
 
+ add_executable(corridor_check src/corridor_check.cpp)
+ target_link_libraries(corridor_check ${catkin_LIBRARIES})
+
 #############
 ## Install ##
 #############

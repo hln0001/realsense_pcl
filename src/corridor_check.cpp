@@ -8,6 +8,8 @@
 
 #include <sensor_msgs/PointCloud2.h>
 
+#include <pcl/filters/voxel_grid.h>
+#include <pcl/filters/passthrough.h>
 
 double camera_height; //camera_height off the ground for ground removal
 double corridor_width; //robot footprint width
@@ -27,13 +29,14 @@ int collision_right; //counter for points to the left
 int collision_left; //counter for points to the left
 
 int collision_threshold; //number of points in collision to trigger avoid/slowdown
+bool slowdown;
 
 void generatePolarHist()
 {
-  
+
 }
 
-void generateHistGrid(pcl::PCLPointCloud2 cloud_filtered)
+void generateHazardMap(pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud)
 {
   //define variables used in this section
  std::vector<float> point;
@@ -41,15 +44,15 @@ void generateHistGrid(pcl::PCLPointCloud2 cloud_filtered)
  int index = 0;
 
  //hazard_map_cells is a vector of vectors, each element of it is a grid in the hazard map that includes 0-N points
- for (int i = 0; i< cloud_filtered->points.size(); i++)
+ for (int i = 0; i< cloud->points.size(); i++)
  {
-     point.push_back(cloud_filtered->points[i].x);
-     point.push_back(cloud_filtered->points[i].y);
-     point.push_back(cloud_filtered->points[i].z);
+     point.push_back(cloud->points[i].x);
+     point.push_back(cloud->points[i].y);
+     point.push_back(cloud->points[i].z);
 
      //the index checks which gird a point belongs to
 
-     index = floor(cloud_filtered->points[i].x + hazard_map_size_x_neg) * (2 * hazard_map_size_y) + floor(cloud_filtered->points[i].y + hazard_map_size_y);
+     index = floor(cloud->points[i].x + hazard_map_size_x_neg) * (2 * hazard_map_size_y) + floor(cloud->points[i].y + hazard_map_size_y);
 
      hazard_map_cells[index].push_back(point);
      point.clear();
@@ -94,24 +97,24 @@ void generateHistGrid(pcl::PCLPointCloud2 cloud_filtered)
        hazard_y.push_back(average_y);
      }
 
-     generatePolarHist();
+   }
 }
 
 void corridorCallback(const sensor_msgs::PointCloud2& cloud_msg)
 {
   //make container for converted cloud
-  //  pcl::PCLPointCloud2::Ptr cloud_temp (new pcl::PCLPointCloud2);
-  pcl::PCLPointCloud2::Ptr cloud (new pcl::PCLPointCloud2 ());
-  pcl::PCLPointCloud2::Ptr cloud_filtered (new pcl::PCLPointCloud2 ());
+  pcl::PCLPointCloud2 cloud_temp;
+  pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud (new pcl::PointCloud<pcl::PointXYZRGB>);
 
   //convert cloud to pcl
-  pcl_conversions::toPCL(cloud_msg, *cloud);
+  pcl_conversions::toPCL(cloud_msg, cloud_temp);
+  pcl::fromPCLPointCloud2(cloud_temp, *cloud);
 
   //Passthrough filter the points in z
-  pcl::PassThrough<pcl::PCLPointCloud2> pass;
+  pcl::PassThrough<pcl::PointXYZRGB> pass;
   pass.setInputCloud(cloud);
   pass.setFilterFieldName("z");
-  pass.setFilterLimits(- camera_height + reactive_height , camera_height * 1.1);
+  pass.setFilterLimits(- reactive_height , camera_height * 1.1); //change these
   pass.filter(*cloud);
 
   //Passthough in y
@@ -127,25 +130,25 @@ void corridorCallback(const sensor_msgs::PointCloud2& cloud_msg)
   pass.filter(*cloud);
 
   //Voxel Grid Filter the points
-  pcl::VoxelGrid<pcl::PCLPointCloud2> vox;
+  pcl::VoxelGrid<pcl::PointXYZRGB> vox;
   vox.setInputCloud(cloud);
   vox.setLeafSize(0.01,0.01,0.01);
-  vox.filter(*cloud_filtered); //I should make it so I don't have to pass these as arguments.
+  vox.filter(*cloud); //I should make it so I don't have to pass these as arguments.
 
-  for(i = 0; i < cloud_filtered->points.size(); i++)
+  for(int i = 0; i < cloud->points.size(); i++)
   {
-    if (cloud_filtered->points[i].y < corridor_width * -0.5 && cloud_filtered->points[i].y > corridor_width * 0.5 )
+    if (cloud->points[i].y < corridor_width * -0.5 && cloud->points[i].y > corridor_width * 0.5 )
       {
-        if (cloud_filtered->points[i].x > 0 && cloud_filtered->points[i].x < corridor_length_slowdown)
+        if (cloud->points[i].x > 0 && cloud->points[i].x < corridor_length_slowdown)
         {
           collision_slowdown++;
         }
 
-        if (cloud_filtered->points[i].x > 0 && cloud_filtered->points[i].x < corridor_length_avoid)
+        if (cloud->points[i].x > 0 && cloud->points[i].x < corridor_length_avoid)
         {
           collision_avoid++;
-          /*
-          if (cloud_filtered->points[i].y > 0)
+
+          if (cloud->points[i].y > 0)
           {
             collision_right++;
           }
@@ -153,7 +156,7 @@ void corridorCallback(const sensor_msgs::PointCloud2& cloud_msg)
           {
             collision_left++;
           }
-          */
+
         }
       }
     }
@@ -164,7 +167,7 @@ void corridorCallback(const sensor_msgs::PointCloud2& cloud_msg)
   }
   if (collision_avoid > collision_threshold)
   {
-    generateHistGrid();
+    generateHazardMap(cloud);
   }
 }
 
@@ -174,17 +177,29 @@ int main(int argc, char** argv)
   ros::init(argc, argv, "planar_segmentation");
   ros::NodeHandle nh;
 
-  nh.param("wall_threshold", wall_threshold, -0.2);
-  nh.param("wall_point_threshold", wall_point_threshold, 50);
-  nh.param("object_point_threshold", object_point_threshold, 100);
-  nh.param("distance_threshold", distance_threshold, 0.1);
-  nh.param("max_iterations", max_iterations, 1000);
+  double hazard_map_size_y;
+  double hazard_map_size_x_neg;
+  double hazard_map_size_x_pos;
 
-  ros::Subscriber sub = nh.subscribe("cloud_filtered", 1, seg_callback);
+  int collision_slowdown; //counter for points within the slowdown region
+  int collision_avoid; //counter for points within avoid region
+  int collision_right; //counter for points to the left
+  int collision_left; //counter for points to the left
 
-  ground_pub = nh.advertise<pcl::PointCloud <pcl::PointXYZRGB> >("ground_points", 1);
-  object_pub = nh.advertise<pcl::PointCloud <pcl::PointXYZRGB> >("object_points", 1);
-  obstacle_pub = nh.advertise<std_msgs::Bool>("obstacle_state", 1);
+  int collision_threshold; //number of points in collision to trigger avoid/slowdown
+  bool slowdown;
+  nh.param("camera_height", camera_height, 0.2);
+  nh.param("corridor_width", corridor_width, 0.72);
+  nh.param("corridor_length_slowdown", corridor_length_slowdown, 8.0);
+  nh.param("corridor_length_avoid", corridor_length_avoid, 1.5);
+  nh.param("reactive_height", reactive_height, 0.1);
+  nh.param("hazard_map_size_y", hazard_map_size_y, 5.0);
+
+  ros::Subscriber sub = nh.subscribe("cloud_filtered", 1, corridorCallback);
+
+  //ground_pub = nh.advertise<pcl::PointCloud <pcl::PointXYZRGB> >("ground_points", 1);
+  //object_pub = nh.advertise<pcl::PointCloud <pcl::PointXYZRGB> >("object_points", 1);
+  //obstacle_pub = nh.advertise<std_msgs::Bool>("obstacle_state", 1);
 
   ros::spin();
 }
