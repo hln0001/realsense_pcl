@@ -13,6 +13,8 @@ find_package(catkin REQUIRED COMPONENTS
   pcl_ros
   roscpp
   sensor_msgs
+  message_generation
+  messages
 )
 
 ## System dependencies are found with CMake's conventions
@@ -51,7 +53,6 @@ find_package(catkin REQUIRED COMPONENTS
 ## Generate messages in the 'msg' folder
 # add_message_files(
 #   FILES
-#   Message1.msg
 #   Message2.msg
 # )
 
@@ -70,10 +71,11 @@ find_package(catkin REQUIRED COMPONENTS
 # )
 
 ## Generate added messages and services with any dependencies listed here
-# generate_messages(
-#   DEPENDENCIES
+ generate_messages(
+   DEPENDENCIES
+
 #   geometry_msgs#   sensor_msgs
-# )
+ )
 
 ################################################
 ## Declare ROS dynamic reconfigure parameters ##
@@ -140,8 +142,8 @@ include_directories(
  add_executable(planar_segmentation src/planar_segmentation.cpp)
  target_link_libraries(planar_segmentation ${catkin_LIBRARIES})
 
- add_executable(corridor_check src/corridor_check.cpp)
- target_link_libraries(corridor_check ${catkin_LIBRARIES})
+ add_executable(collision_detection src/collision_detection.cpp)
+ target_link_libraries(collision_detection ${catkin_LIBRARIES})
 
 #############
 ## Install ##

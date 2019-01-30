@@ -55,6 +55,8 @@
   <build_depend>libpcl-all-dev</build_depend>
   <build_depend>roslaunch</build_depend>
   <build_depend>sensor_msgs</build_depend>
+  <build_depend>messages</build_depend>
+  <build_depend>message_generation</build_depend>
   <build_export_depend>geometry_msgs</build_export_depend>
   <build_export_depend>pcl_ros</build_export_depend>
   <build_export_depend>roscpp</build_export_depend>
@@ -64,6 +66,8 @@
   <exec_depend>roscpp</exec_depend>
   <exec_depend>sensor_msgs</exec_depend>
   <exec_depend>libpcl-all</exec_depend>
+  <exec_depend>message_runtime</exec_depend>
+  <exec_depend>messages</exec_depend>
 
 
   <!-- The export tag contains other, unspecified, tags -->

@@ -10,6 +10,7 @@
 
 #include <pcl/filters/voxel_grid.h>
 #include <pcl/filters/passthrough.h>
+#include <messages/CollisionTrajectory.h>
 
 double camera_height; //camera_height off the ground for ground removal
 double corridor_width; //robot footprint width
@@ -27,9 +28,13 @@ int collision_slowdown; //counter for points within the slowdown region
 int collision_avoid; //counter for points within avoid region
 int collision_right; //counter for points to the left
 int collision_left; //counter for points to the left
+int collision_status = 0;
+int threshold_min_angle;
 
 int collision_threshold; //number of points in collision to trigger avoid/slowdown
 bool slowdown;
+
+messages::CollisionTrajectory = traj_msg;
 
 void generatePolarHist()
 {
@@ -135,6 +140,12 @@ void corridorCallback(const sensor_msgs::PointCloud2& cloud_msg)
   vox.setLeafSize(0.01,0.01,0.01);
   vox.filter(*cloud); //I should make it so I don't have to pass these as arguments.
 
+  collision_left = 0;
+  collision_right = 0;
+  collision_avoid = 0;
+  collision_slowdown = 0;
+  //collision_status = 0;
+
   for(int i = 0; i < cloud->points.size(); i++)
   {
     if (cloud->points[i].y < corridor_width * -0.5 && cloud->points[i].y > corridor_width * 0.5 )
@@ -165,10 +176,44 @@ void corridorCallback(const sensor_msgs::PointCloud2& cloud_msg)
   {
     slowdown = true;
   }
+  else
+  {
+    collision_slowdown = 0;
+  }
+
   if (collision_avoid > collision_threshold)
   {
-    generateHazardMap(cloud);
+    collision_status = 1;
+
+    hazard_x.clear();
+    hazard_y.clear();
+
+    if (cloud->points.size() > 0)
+    {
+      int choice = -1;
+
+      double right_angle = threshold_min_angle * PI / 180;
+      double left_angle = -threshold_min_angle * PI / 180;
+
+      double right_angle_final = 0;
+      double left_angle_final = 0;
+
+      generateHazardMap(cloud);
+
+      for(int j = 0; j < 5; j++)
+      {
+        right_angle_final = right_angle + j * (15 * PI / 180);
+        left_angle_final = left_angle - j * (15 * PI / 180);
+
+        traj = generateTrajectory(-left_angle_final + 0.5 * PI, 0.5 * PI - right_angle_final, collision_left, collision_right)
+      }
+    }
   }
+  else
+  {
+    collision_avoid = 0;
+  }
+
 }
 
 
@@ -194,6 +239,7 @@ int main(int argc, char** argv)
   nh.param("corridor_length_avoid", corridor_length_avoid, 1.5);
   nh.param("reactive_height", reactive_height, 0.1);
   nh.param("hazard_map_size_y", hazard_map_size_y, 5.0);
+  nh.param("threshold_min_angle", threshold_min_angle, 5);
 
   ros::Subscriber sub = nh.subscribe("cloud_filtered", 1, corridorCallback);
 
