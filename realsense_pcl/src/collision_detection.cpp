@@ -11,6 +11,7 @@
 #include <pcl/filters/voxel_grid.h>
 #include <pcl/filters/passthrough.h>
 #include <messages/CollisionTrajectory.h>
+#include <math.h>
 
 double camera_height; //camera_height off the ground for ground removal
 double corridor_width; //robot footprint width
@@ -34,9 +35,9 @@ int threshold_min_angle;
 int collision_threshold; //number of points in collision to trigger avoid/slowdown
 bool slowdown;
 
-messages::CollisionTrajectory = traj_msg;
+messages::CollisionTrajectory traj_msg;
 
-void generatePolarHist()
+void generateTrajectory(double left, double right, int count_left, int count_right)
 {
 
 }
@@ -192,8 +193,8 @@ void corridorCallback(const sensor_msgs::PointCloud2& cloud_msg)
     {
       int choice = -1;
 
-      double right_angle = threshold_min_angle * PI / 180;
-      double left_angle = -threshold_min_angle * PI / 180;
+      double right_angle = threshold_min_angle * M_PI / 180;
+      double left_angle = -threshold_min_angle * M_PI / 180;
 
       double right_angle_final = 0;
       double left_angle_final = 0;
@@ -202,10 +203,10 @@ void corridorCallback(const sensor_msgs::PointCloud2& cloud_msg)
 
       for(int j = 0; j < 5; j++)
       {
-        right_angle_final = right_angle + j * (15 * PI / 180);
-        left_angle_final = left_angle - j * (15 * PI / 180);
+        right_angle_final = right_angle + j * (15 * M_PI / 180);
+        left_angle_final = left_angle - j * (15 * M_PI / 180);
 
-        traj = generateTrajectory(-left_angle_final + 0.5 * PI, 0.5 * PI - right_angle_final, collision_left, collision_right)
+        generateTrajectory(-left_angle_final + 0.5 * M_PI, 0.5 * M_PI - right_angle_final, collision_left, collision_right);
       }
     }
   }
