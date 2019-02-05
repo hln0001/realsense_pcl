@@ -18,6 +18,10 @@ double corridor_width; //robot footprint width
 double corridor_length_slowdown; //distance to slowdown on collision
 double corridor_length_avoid; //distance to stop/search on collision
 double reactive_height; //height of obstacles handled by drivetrain
+double threshold_obstacle_distance;
+int threshold_obstacle_number;
+double near_dist;
+double far_dist;
 
 std::vector<float> hazard_x;
 std::vector<float> hazard_y;
@@ -33,12 +37,95 @@ int collision_status = 0;
 int threshold_min_angle;
 
 int collision_threshold; //number of points in collision to trigger avoid/slowdown
-bool slowdown;
+
+ros::Publisher pub;
 
 messages::CollisionTrajectory traj_msg;
 
-void generateTrajectory(double left, double right, int count_left, int count_right)
+int collisionCounter(double angle, double distance)
 {
+  int count = 0;
+	for(int i = 0; i < hazard_x.size(); i++)
+	{
+		if(hazard_x[i] > - 1 / tan(angle) * hazard_y[i] && hazard_x[i] < - 1 / tan(angle) * hazard_y[i] + distance / sin(angle))
+		{
+			if(fabs(cos(angle) * (hazard_x[i] - hazard_y[i] * tan(angle))) < threshold_obstacle_distance)
+			{
+				count++;
+			}
+		}
+	}
+  return count;
+
+}
+
+bool generateTrajectory(double left, double right, int count_left, int count_right)
+{
+  int left_far_count = -1;
+  int right_far_count = -1;
+  int left_near_count = -1;
+  int right_near_count = -1;
+  int left_status = 0;
+
+  if (count_left < count_right)
+  {
+    left_near_count = collisionCounter(left, near_dist);
+
+    if(left_near_count < threshold_obstacle_number && left_near_count > 0)
+    {
+      left_far_count = collisionCounter(left, far_dist);
+
+      if (left_far_count < threshold_obstacle_number && left_far_count > 0) //if far is clear
+      {
+        //go left_far
+        left_status = 2;
+        traj_msg.angle = left;
+        traj_msg.distance = far_dist;
+      }
+      else //far is no good but near is
+      {
+        //go left_near
+        left_status = 1;
+        traj_msg.angle = left;
+        traj_msg.distance = near_dist;
+      }
+    }
+    else
+    {
+      //dont go left
+      left_status = 0;
+    }
+  }
+
+  if(count_right <= count_left || left_status != 2)
+  {
+    right_near_count = collisionCounter(right, near_dist);
+
+    if(right_near_count < threshold_obstacle_number && right_near_count > 0)
+    {
+      right_far_count = collisionCounter(right, far_dist);
+      if (right_far_count < threshold_obstacle_number && right_far_count > 0) //if far is clear
+      {
+        //go right_far
+        traj_msg.angle = right;
+        traj_msg.distance = far_dist;
+      }
+      else //far is no good
+      {
+        if(right_near_count < left_near_count)//if right is better
+        {
+          //go right_near
+          traj_msg.angle = right;
+          traj_msg.distance = near_dist;
+        }
+      }
+    }
+    else
+    {
+      //dont go right
+      return false; //no good trajectory.
+    }
+  }
 
 }
 
@@ -175,7 +262,7 @@ void corridorCallback(const sensor_msgs::PointCloud2& cloud_msg)
 
   if (collision_slowdown > collision_threshold)
   {
-    slowdown = true;
+    traj_msg.slowdown = true;
   }
   else
   {
@@ -184,14 +271,13 @@ void corridorCallback(const sensor_msgs::PointCloud2& cloud_msg)
 
   if (collision_avoid > collision_threshold)
   {
-    collision_status = 1;
+    traj_msg.collision_status += 1;
 
     hazard_x.clear();
     hazard_y.clear();
 
     if (cloud->points.size() > 0)
     {
-      int choice = -1;
 
       double right_angle = threshold_min_angle * M_PI / 180;
       double left_angle = -threshold_min_angle * M_PI / 180;
@@ -200,13 +286,26 @@ void corridorCallback(const sensor_msgs::PointCloud2& cloud_msg)
       double left_angle_final = 0;
 
       generateHazardMap(cloud);
+      bool traj_available = false;
 
       for(int j = 0; j < 5; j++)
       {
         right_angle_final = right_angle + j * (15 * M_PI / 180);
         left_angle_final = left_angle - j * (15 * M_PI / 180);
 
-        generateTrajectory(-left_angle_final + 0.5 * M_PI, 0.5 * M_PI - right_angle_final, collision_left, collision_right);
+        traj_available = generateTrajectory(-left_angle_final + 0.5 * M_PI, 0.5 * M_PI - right_angle_final, collision_left, collision_right);
+
+        if(traj_available)
+        {
+          break;
+        }
+      }
+
+      if(!traj_available)
+      {
+        //go straight to the side
+        traj_msg.angle = 110*M_PI/180;
+        traj_msg.distance = 3;
       }
     }
   }
@@ -214,7 +313,7 @@ void corridorCallback(const sensor_msgs::PointCloud2& cloud_msg)
   {
     collision_avoid = 0;
   }
-
+  pub.publish(traj_msg);
 }
 
 
@@ -232,8 +331,7 @@ int main(int argc, char** argv)
   int collision_right; //counter for points to the left
   int collision_left; //counter for points to the left
 
-  int collision_threshold; //number of points in collision to trigger avoid/slowdown
-  bool slowdown;
+  nh.param("collision_threshold", collision_threshold, 100); //number of points in collision to trigger avoid/slowdown
   nh.param("camera_height", camera_height, 0.2);
   nh.param("corridor_width", corridor_width, 0.72);
   nh.param("corridor_length_slowdown", corridor_length_slowdown, 8.0);
@@ -241,12 +339,14 @@ int main(int argc, char** argv)
   nh.param("reactive_height", reactive_height, 0.1);
   nh.param("hazard_map_size_y", hazard_map_size_y, 5.0);
   nh.param("threshold_min_angle", threshold_min_angle, 5);
+  nh.param("threshold_obstacle_distance", threshold_obstacle_distance, 1.0);
+  nh.param("threshold_obstacle_number", threshold_obstacle_number, 100);
+  nh.param("near_dist", near_dist, 4.0);
+  nh.param("far_dist", far_dist, 8.0);
 
-  ros::Subscriber sub = nh.subscribe("cloud_filtered", 1, corridorCallback);
+  ros::Subscriber sub = nh.subscribe("rover_cloud", 1, corridorCallback);
 
-  //ground_pub = nh.advertise<pcl::PointCloud <pcl::PointXYZRGB> >("ground_points", 1);
-  //object_pub = nh.advertise<pcl::PointCloud <pcl::PointXYZRGB> >("object_points", 1);
-  //obstacle_pub = nh.advertise<std_msgs::Bool>("obstacle_state", 1);
+  pub = nh.advertise<messages::CollisionTrajectory>("collision_trajectory", 1);
 
   ros::spin();
 }
