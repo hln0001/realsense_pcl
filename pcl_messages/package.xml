@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <package>
-  <name>messages</name>
+  <name>pcl_messages</name>
   <version>0.3.0</version>
   <description>Messages for WVU MRT</description>
 
