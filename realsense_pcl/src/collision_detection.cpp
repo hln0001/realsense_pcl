@@ -206,7 +206,6 @@ void corridorCallback(const sensor_msgs::PointCloud2& cloud_msg)
 
   //Passthrough filter the points in z
   pcl::PassThrough<pcl::PointXYZRGB> pass;
-
   pass.setInputCloud(cloud);
   pass.setFilterFieldName("z");
   pass.setFilterLimits(-reactive_height , camera_height * 1.1);
@@ -216,7 +215,6 @@ void corridorCallback(const sensor_msgs::PointCloud2& cloud_msg)
   pass.setInputCloud(cloud);
   pass.setFilterFieldName("y");
   pass.setFilterLimits(-hazard_map_size_y,  hazard_map_size_y);
-  //pass.setFilterLimits(-10,  10);
   pass.filter(*cloud);
 
   //passthrough filter the points in x
@@ -264,8 +262,8 @@ void corridorCallback(const sensor_msgs::PointCloud2& cloud_msg)
           {
             collision_left++;
           }
-
         }
+        ROS_INFO("slowdown:%i", collision_slowdown);
       }
     }
   if (collision_slowdown > collision_threshold)
