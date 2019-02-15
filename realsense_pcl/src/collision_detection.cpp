@@ -10,6 +10,7 @@
 
 #include <pcl/filters/voxel_grid.h>
 #include <pcl/filters/passthrough.h>
+#include <pcl/common/transforms.h>
 #include <pcl_messages/CollisionTrajectory.h>
 #include <math.h>
 
@@ -199,7 +200,7 @@ void corridorCallback(const sensor_msgs::PointCloud2& cloud_msg)
   //make container for converted cloud
   pcl::PCLPointCloud2::Ptr cloud_temp (new pcl::PCLPointCloud2 ());
   pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud (new pcl::PointCloud<pcl::PointXYZRGB>);
-
+	pcl::PointCloud<pcl::PointXYZRGB>::Ptr transform_cloud (new pcl::PointCloud<pcl::PointXYZRGB>);
   //convert cloud to pcl
   pcl_conversions::toPCL(cloud_msg, *cloud_temp);
   pcl::fromPCLPointCloud2(*cloud_temp, *cloud);
@@ -208,20 +209,21 @@ void corridorCallback(const sensor_msgs::PointCloud2& cloud_msg)
   pcl::PassThrough<pcl::PointXYZRGB> pass;
   pass.setInputCloud(cloud);
   pass.setFilterFieldName("z");
-  pass.setFilterLimits(-reactive_height , camera_height * 1.1);
-  pass.filter(*cloud);
+  pass.setFilterLimits(-hazard_map_size_x_neg, hazard_map_size_x_pos);
+	pass.filter(*cloud);
 
-  //Passthough in y
+  //Passthough in y (the new x-axis after rotating)
   pass.setInputCloud(cloud);
   pass.setFilterFieldName("y");
-  pass.setFilterLimits(-hazard_map_size_y,  hazard_map_size_y);
+  pass.setFilterLimits(-camera_height * 1.1, reactive_height);
   pass.filter(*cloud);
 
-  //passthrough filter the points in x
+  //passthrough filter the points in x 
   pass.setInputCloud(cloud);
   pass.setFilterFieldName("x");
-  pass.setFilterLimits(-hazard_map_size_x_neg, hazard_map_size_x_pos); 
+  pass.setFilterLimits(-hazard_map_size_y,  hazard_map_size_y); 
   pass.filter(*cloud);
+
 
   //Voxel Grid Filter the points
   pcl::VoxelGrid<pcl::PointXYZRGB> vox;
@@ -229,32 +231,51 @@ void corridorCallback(const sensor_msgs::PointCloud2& cloud_msg)
   vox.setLeafSize(0.02,0.02,0.02);
   vox.filter(*cloud); 
 
-  int cloudsize = cloud->points.size();
-  ROS_INFO("%i",cloudsize);
+	Eigen::Matrix4f transform_1 = Eigen::Matrix4f::Zero();
+  transform_1 (1,0) = -1;
+  transform_1 (2,1) = -1;
+  transform_1 (0,2) = 1;
 
-  pub2.publish(cloud);
+	pcl::transformPointCloud (*cloud, *transform_cloud, transform_1);
 
+  //int cloudsize = transform_cloud->points.size();
+  //ROS_INFO("%i",cloudsize);
+
+  pub2.publish(transform_cloud);
+//pub2.publish(cloud);
+	
   collision_left = 0;
   collision_right = 0;
   collision_avoid = 0;
   collision_slowdown = 0;
   //collision_status = 0;
 
+	
 
-  for(int i = 0; i < cloud->points.size(); i++)
+	//ROS_INFO("y: %f",transform_cloud->points[10].y);
+	//ROS_INFO("x: %f",transform_cloud->points[10].x);
+	//ROS_INFO("y: %f",transform_cloud->points[10].z);
+
+
+  for(int i = 0; i < transform_cloud->points.size(); i++)
   {
-    if (cloud->points[i].y < corridor_width * -0.5 && cloud->points[i].y > corridor_width * 0.5 )
+		ROS_INFO("y: %f",transform_cloud->points[i].y);
+		//ROS_INFO("x: %f",transform_cloud->points[i].x);
+    if (transform_cloud->points[i].y < corridor_width * -0.5 || transform_cloud->points[i].y > corridor_width * 0.5 )
       {
-        if (cloud->points[i].x > 0 && cloud->points[i].x < corridor_length_slowdown)
+				//ROS_INFO("a");
+        if (transform_cloud->points[i].x > 0 && transform_cloud->points[i].x < corridor_length_slowdown)
         {
+					//ROS_INFO("b");
           collision_slowdown++;
         }
 
-        if (cloud->points[i].x > 0 && cloud->points[i].x < corridor_length_avoid)
+        if (transform_cloud->points[i].x > 0 && transform_cloud->points[i].x < corridor_length_avoid)
         {
+					//ROS_INFO("c");
           collision_avoid++;
 
-          if (cloud->points[i].y > 0)
+          if (transform_cloud->points[i].y > 0)
           {
             collision_right++;
           }
@@ -282,7 +303,7 @@ void corridorCallback(const sensor_msgs::PointCloud2& cloud_msg)
     hazard_x.clear();
     hazard_y.clear();
 
-    if (cloud->points.size() > 0)
+    if (transform_cloud->points.size() > 0)
     {
 
       double right_angle = threshold_min_angle * M_PI / 180;
@@ -291,7 +312,7 @@ void corridorCallback(const sensor_msgs::PointCloud2& cloud_msg)
       double right_angle_final = 0;
       double left_angle_final = 0;
 
-      generateHazardMap(cloud);
+      generateHazardMap(transform_cloud);
       bool traj_available = false;
 
       for(int j = 0; j < 5; j++)
@@ -299,7 +320,7 @@ void corridorCallback(const sensor_msgs::PointCloud2& cloud_msg)
         right_angle_final = right_angle + j * (15 * M_PI / 180);
         left_angle_final = left_angle - j * (15 * M_PI / 180);
 
-        traj_available = generateTrajectory(-left_angle_final + 0.5 * M_PI, 0.5 * M_PI - right_angle_final, collision_left, collision_right);
+        traj_available = generateTrajectory(left_angle_final, right_angle_final, collision_left, collision_right);
 
         if(traj_available)
         {
