@@ -1,6 +1,6 @@
 <launch>
 	<!--Realsense launch file-->
-	<include file="$(find realsense2_camera)/launch/rs_rgbd.launch"/>
+	<!--<include file="$(find realsense2_camera)/launch/rs_rgbd.launch"/>-->
 	
 	<!--Set parameters for filter here-->
 	<param name="wall_threshold" value="1"/> <!--Z-height (referenced from camera) for a wall point in the ground plane pointcloud (higher = more obstacles ignored)-->
