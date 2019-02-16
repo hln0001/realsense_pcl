@@ -147,9 +147,6 @@ include_directories(
  add_executable(collision_detection src/collision_detection.cpp)
  target_link_libraries(collision_detection ${catkin_LIBRARIES})
 
- add_executable(feedback_controller src/feedbackController.cpp)
- target_link_libraries(feedback_controller ${catkin_LIBRARIES})
-
 # add_executable(pointcloud_transformer src/pointcloud_transformer.cpp)
 # target_link_libraries(pointcloud_transformer ${catkin_LIBRARIES})
 
