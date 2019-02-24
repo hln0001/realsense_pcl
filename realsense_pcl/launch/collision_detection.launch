@@ -1,23 +1,23 @@
 <launch>
 	<!--Realsense launch file-->
 	<!--<include file="$(find realsense2_camera)/launch/rs_rgbd.launch"/>-->
-	
+
 	<!--Set parameters for filter here-->
-	<param name="collision_threshold" value="0"/> 
-	<param name="camera_height" value="0.2"/> 
-	<param name="corridor_width" value="0.2"/> 
-	<param name="corridor_length_slowdown" value="2.0"/>
-	<param name="corridor_length_avoid" value="0.5"/>
-	<param name="reactive_height" value="0.5"/>
+
+	<param name="collision_threshold" value="150"/>
+	<param name="camera_height" value="0.1"/>
+	<param name="corridor_width" value="0.2"/>
+	<param name="corridor_length_slowdown" value="2"/>
+	<param name="corridor_length_avoid" value="1.5"/>
+	<param name="reactive_height" value="10"/>
 	<param name="hazard_map_size_y" value="1.0"/>
 	<param name="hazard_map_size_x_neg" value="1.0"/>
-	<param name="hazard_map_size_x_pos" value="10.0"/>
+	<param name="hazard_map_size_x_pos" value="3"/>
 	<param name="threshold_min_angle" value="5"/>
 	<param name="threshold_obstacle_distance" value="0.5"/>
-	<param name="threshold_obstacle_number" value="100"/>
+	<param name="threshold_obstacle_number" value="10"/>
 	<param name="near_dist" value="4"/>
 	<param name="far_dist" value="8"/>
 
 	<node name="collision_detection" pkg="realsense_pcl" type="collision_detection" output="screen"/>
 </launch>
-

@@ -44,19 +44,9 @@ ros::Publisher pub2;
 
 pcl_messages::CollisionTrajectory traj_msg;
 
-bool traj_available;
-
 int collisionCounter(double angle, double distance)
 {
   int count = 0;
-  for(int i = 0; i < hazard_x.size(); i++)
-	{
-    if( abs( tan(angle) - (hazard_y[i]/hazard_x[i]) ) < 7.5)
-     {
-       count++;
-     }
-   }
-  /*
 	for(int i = 0; i < hazard_x.size(); i++)
 	{
 		if(hazard_x[i] > - 1 / tan(angle) * hazard_y[i] && hazard_x[i] < - 1 / tan(angle) * hazard_y[i] + distance / sin(angle))
@@ -67,48 +57,39 @@ int collisionCounter(double angle, double distance)
 			}
 		}
 	}
-  */
   return count;
 
 }
 
 bool generateTrajectory(double left, double right, int count_left, int count_right)
 {
-  //ROS_INFO("threshold:%i", threshold_obstacle_number);
   int left_far_count = -1;
   int right_far_count = -1;
   int left_near_count = -1;
   int right_near_count = -1;
   int left_status = 0;
-  int traj_status = 0;
 
   if (count_left < count_right)
   {
     left_near_count = collisionCounter(left, near_dist);
-    //ROS_INFO("left_near_count:%i", left_near_count);
 
-    if(left_near_count < threshold_obstacle_number) //&& left_near_count > 0)
+    if(left_near_count < threshold_obstacle_number && left_near_count > 0)
     {
       left_far_count = collisionCounter(left, far_dist);
-      //ROS_INFO("left_far_count:%i", left_far_count);
 
-      if (left_far_count < threshold_obstacle_number) //&& left_far_count > 0) //if far is clear
+      if (left_far_count < threshold_obstacle_number && left_far_count > 0) //if far is clear
       {
         //go left_far
-        //ROS_INFO("left_far");
         left_status = 2;
         traj_msg.angle = left;
         traj_msg.distance = far_dist;
-        traj_status++;
       }
       else //far is no good but near is
       {
         //go left_near
-        //ROS_INFO("left_near");
         left_status = 1;
         traj_msg.angle = left;
         traj_msg.distance = near_dist;
-        traj_status++;
       }
     }
     else
@@ -121,39 +102,32 @@ bool generateTrajectory(double left, double right, int count_left, int count_rig
   if(count_right <= count_left || left_status != 2)
   {
     right_near_count = collisionCounter(right, near_dist);
-    //ROS_INFO("right_near_count:%i", right_near_count);
 
-    if(right_near_count < threshold_obstacle_number) //&& right_near_count > 0)
+    if(right_near_count < threshold_obstacle_number && right_near_count > 0)
     {
       right_far_count = collisionCounter(right, far_dist);
-      //ROS_INFO("right_far_count:%i", right_far_count);
-      if (right_far_count < threshold_obstacle_number) //&& right_far_count > 0) //if far is clear
+      if (right_far_count < threshold_obstacle_number && right_far_count > 0) //if far is clear
       {
         //go right_far
-        //ROS_INFO("right_far");
         traj_msg.angle = right;
         traj_msg.distance = far_dist;
-        traj_status++;
       }
       else //far is no good
       {
         if(right_near_count < left_near_count)//if right is better
         {
           //go right_near
-          //ROS_INFO("right_near");
           traj_msg.angle = right;
           traj_msg.distance = near_dist;
-          traj_status++;
         }
       }
     }
+    else
+    {
+      //dont go right
+      return false; //no good trajectory.
+    }
   }
-
-  if(traj_status == 0)
-  {
-    return false;
-  }
-  else return true;
 
 }
 
@@ -244,10 +218,10 @@ void corridorCallback(const sensor_msgs::PointCloud2& cloud_msg)
   pass.setFilterLimits(-camera_height * 1.1, reactive_height);
   pass.filter(*cloud);
 
-  //passthrough filter the points in x
+  //passthrough filter the points in x 
   pass.setInputCloud(cloud);
   pass.setFilterFieldName("x");
-  pass.setFilterLimits(-hazard_map_size_y,  hazard_map_size_y);
+  pass.setFilterLimits(-hazard_map_size_y,  hazard_map_size_y); 
   pass.filter(*cloud);
 
 
@@ -255,7 +229,7 @@ void corridorCallback(const sensor_msgs::PointCloud2& cloud_msg)
   pcl::VoxelGrid<pcl::PointXYZRGB> vox;
   vox.setInputCloud(cloud);
   vox.setLeafSize(0.02,0.02,0.02);
-  vox.filter(*cloud);
+  vox.filter(*cloud); 
 
 	Eigen::Matrix4f transform_1 = Eigen::Matrix4f::Zero();
   transform_1 (1,0) = -1;
@@ -269,14 +243,14 @@ void corridorCallback(const sensor_msgs::PointCloud2& cloud_msg)
 
   pub2.publish(transform_cloud);
 //pub2.publish(cloud);
-
+	
   collision_left = 0;
   collision_right = 0;
   collision_avoid = 0;
   collision_slowdown = 0;
   //collision_status = 0;
 
-
+	
 
 	//ROS_INFO("y: %f",transform_cloud->points[10].y);
 	//ROS_INFO("x: %f",transform_cloud->points[10].x);
@@ -285,7 +259,7 @@ void corridorCallback(const sensor_msgs::PointCloud2& cloud_msg)
 
   for(int i = 0; i < transform_cloud->points.size(); i++)
   {
-		//ROS_INFO("y: %f",transform_cloud->points[i].y);
+		ROS_INFO("y: %f",transform_cloud->points[i].y);
 		//ROS_INFO("x: %f",transform_cloud->points[i].x);
     if (transform_cloud->points[i].y < corridor_width * -0.5 || transform_cloud->points[i].y > corridor_width * 0.5 )
       {
@@ -310,22 +284,21 @@ void corridorCallback(const sensor_msgs::PointCloud2& cloud_msg)
             collision_left++;
           }
         }
-        //ROS_INFO("slowdown:%i", collision_slowdown);
+        ROS_INFO("slowdown:%i", collision_slowdown);
       }
     }
   if (collision_slowdown > collision_threshold)
   {
-    traj_msg.collision_status = 0;
+    traj_msg.slowdown = true;
   }
   else
   {
     collision_slowdown = 0;
-    traj_msg.collision_status = -1;
   }
 
   if (collision_avoid > collision_threshold)
   {
-    traj_msg.collision_status = 1;
+    traj_msg.collision_status += 1;
 
     hazard_x.clear();
     hazard_y.clear();
@@ -340,11 +313,12 @@ void corridorCallback(const sensor_msgs::PointCloud2& cloud_msg)
       double left_angle_final = 0;
 
       generateHazardMap(transform_cloud);
+      bool traj_available = false;
 
       for(int j = 0; j < 5; j++)
       {
-        right_angle_final = right_angle - j * (15 * M_PI / 180);
-        left_angle_final = left_angle + j * (15 * M_PI / 180);
+        right_angle_final = right_angle + j * (15 * M_PI / 180);
+        left_angle_final = left_angle - j * (15 * M_PI / 180);
 
         traj_available = generateTrajectory(left_angle_final, right_angle_final, collision_left, collision_right);
 
