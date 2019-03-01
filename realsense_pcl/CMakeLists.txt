@@ -14,7 +14,7 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   sensor_msgs
   message_generation
-  messages
+  pcl_messages
   tf2
   tf
 )
